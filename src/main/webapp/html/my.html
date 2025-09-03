@@ -4,9 +4,355 @@
     <script src=https://code.jquery.com/jquery-3.6.0.min.js></script>
     <link href="/css/my.css" rel="stylesheet">
 </head>
-<body>
+<body onload="list(); loadTotalCount();">
 <h1>RPG admin panel</h1>
 <h2>Accounts list:</h2>
+
+<table id="accountsTable" border="1">
+    <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Title</th>
+        <th>Race</th>
+        <th>Profession</th>
+        <th>Level</th>
+        <th>Birthday</th>
+        <th>Banned</th>
+        <th>Edit</th>
+        <th>Delete</th>
+    </tr>
+</table>
+
+<div id="paginationSection">
+    <div>
+        Mostrar
+        <select id="pageSizeSelect">
+            <option value="3">3</option>
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="20">20</option>
+        </select> cuentas por página
+    </div>
+    <div id="paginationButtons"></div>
+</div>
+
+<hr>
+
+<h3>Create new account</h3>
+<form id="createAccountForm">
+    <label>Name: <input type="text" id="newName" maxlength="12" required></label><br>
+    <label>Title: <input type="text" id="newTitle" maxlength="30"></label><br>
+
+    <label>Race:
+        <select id="newRace">
+        </select>
+    </label><br>
+
+    <label>Profession:
+        <select id="newProfession">
+        </select>
+    </label><br>
+
+    <label>Level: <input type="number" id="newLevel" min="0" max="100" value="0"></label><br>
+    <label>Birthday: <input type="date" id="newBirthday"></label><br>
+
+    <label>Banned:
+        <select id="newBanned">
+            <option value="false">false</option>
+            <option value="true">true</option>
+        </select>
+    </label><br><br>
+
+    <button type="button" id="saveBtn" onclick="createAccount()">
+        <img src="/img/save.png" alt="save icon" style="width:16px; vertical-align:middle;">
+        <span>Save</span>
+    </button>
+</form>
+
+<style>
+    .active-page {
+      background-color: #007bff;
+      color: white;
+      font-weight: bold;
+    }
+
+    #accountsTable {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+        background-color: #f9f9f9;
+        box-shadow: 0px 2px 8px rgba(0,0,0,0.1);
+    }
+
+    #accountsTable th, #accountsTable td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: center;
+    }
+
+    #accountsTable th {
+        background-color: #4CAF50;
+        color: white;
+    }
+
+    #accountsTable tr:nth-child(even) {
+        background-color: #f2f2f2;
+    }
+
+    #accountsTable tr:hover {
+        background-color: #e6f7ff;
+    }
+
+    #paginationButtons button {
+        margin: 3px;
+        padding: 5px 10px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        background-color: #4CAF50;
+        color: white;
+        transition: background-color 0.2s;
+    }
+
+    #paginationButtons button:hover {
+        background-color: #45a049;
+    }
+
+    #paginationButtons .active-page {
+        background-color: #2196F3;
+    }
+
+    #createAccountForm {
+        margin-top: 20px;
+        padding: 15px;
+        background: #f0f0f0;
+        border-radius: 6px;
+        box-shadow: 0px 2px 8px rgba(0,0,0,0.1);
+    }
+
+    #createAccountForm label {
+        display: block;
+        margin-bottom: 10px;
+    }
+
+    #createAccountForm input, #createAccountForm select {
+        padding: 6px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        width: 250px;
+    }
+
+    #createAccountForm button {
+        margin-top: 10px;
+        padding: 8px 16px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        background-color: #2196F3;
+        color: white;
+        font-weight: bold;
+        transition: background-color 0.2s;
+    }
+
+    #createAccountForm button:hover {
+        background-color: #1976d2;
+    }
+
+</style>
+
+<script>
+    let currentPage = 0;
+    let pageSize = 3;
+
+    function list(page = 0, size = pageSize) {
+        currentPage = page;
+        pageSize = size;
+
+        let url = "/rest/players?pageNumber=" + page + "&pageSize=" + size;
+
+        $.get(url, function(response) {
+            $("#accountsTable tr:not(:first)").remove();
+
+            $.each(response, function (i, item) {
+                $('<tr>').html(
+                    "<td>" + (i + 1 + page * size) + "</td><td>"
+                    + item.name + "</td><td>"
+                    + item.title + "</td><td>"
+                    + item.race + "</td><td>"
+                    + item.profession + "</td><td>"
+                    + item.level + "</td><td>"
+                    + new Date(item.birthday).toLocaleDateString() + "</td><td>"
+                    + item.banned + "</td><td>"
+                    + "<img src='/img/edit.png' class='edit-btn' data-id='" + item.id + "' style='cursor:pointer;width:20px'/>" + "</td><td>"
+                    + "<img src='/img/delete.png' class='delete-btn' data-id='" + item.id + "' style='cursor:pointer;width:20px'/>" + "</td>"
+                ).appendTo("#accountsTable");
+            });
+
+            loadTotalCount();
+        });
+    }
+
+    function loadTotalCount() {
+        $.get("/rest/players/count", function(count) {
+            let totalPages = Math.ceil(count / pageSize);
+            let buttonsDiv = $("#paginationButtons");
+
+            buttonsDiv.empty();
+
+            for (let i = 0; i < totalPages; i++) {
+                let btn = $("<button>")
+                    .text(i + 1)
+                    .on("click", function() {
+                        list(i, pageSize);
+                    });
+
+                if (i === currentPage) {
+                    btn.addClass("active-page");
+                }
+
+                buttonsDiv.append(btn);
+            }
+        });
+    }
+
+    function deleteAccount(id) {
+        if (confirm("¿Seguro que deseas eliminar el jugador con ID: " + id + "?")) {
+            $.ajax({
+                url: "/rest/players/" + id,
+                type: "DELETE",
+                success: function() {
+                    alert("Jugador eliminado con éxito");
+                    list(currentPage, pageSize);
+                },
+                error: function() {
+                    alert("Error al eliminar el jugador con ID: " + id);
+                }
+            });
+        }
+    }
+
+    function editAccount(id, btn) {
+    let row = $(btn).closest("tr");
+    let cells = row.find("td");
+
+    if ($(btn).data("editing")) {
+        let updatedAccount = {
+            name: cells.eq(1).find("input").val(),
+            title: cells.eq(2).find("input").val(),
+            race: cells.eq(3).find("input").val(),
+            profession: cells.eq(4).find("input").val(),
+            banned: cells.eq(7).find("select").val() === "true"
+        };
+
+        $.ajax({
+            url: "/rest/players/" + id,
+            type: "POST",
+            contentType: "application/json",
+            data: JSON.stringify(updatedAccount),
+            success: function() {
+                list(currentPage, pageSize);
+            },
+            error: function() {
+                alert("Error al actualizar el jugador con ID: " + id);
+            }
+        });
+    } else {
+        cells.eq(1).html('<input type="text" value="' + cells.eq(1).text() + '">');
+        cells.eq(2).html('<input type="text" value="' + cells.eq(2).text() + '">');
+        cells.eq(3).html('<input type="text" value="' + cells.eq(3).text() + '">');
+        cells.eq(4).html('<input type="text" value="' + cells.eq(4).text() + '">');
+        cells.eq(7).html(
+            '<select>' +
+            '<option value="true">true</option>' +
+            '<option value="false">false</option>' +
+            '</select>'
+        );
+
+        cells.eq(7).find("select").val(cells.eq(7).text());
+
+        $(btn).attr("src", "/img/save.png");
+
+        row.find(".delete-btn").hide();
+
+        $(btn).data("editing", true);
+    }
+}
+
+    function createAccount() {
+        let newAccount = {
+            name: document.getElementById("newName").value,
+            title: document.getElementById("newTitle").value,
+            race: document.getElementById("newRace").value,
+            profession: document.getElementById("newProfession").value,
+            level: parseInt(document.getElementById("newLevel").value),
+            birthday: new Date(document.getElementById("newBirthday").value).getTime(),
+            banned: document.getElementById("newBanned").value === "true"
+        };
+
+        fetch("/rest/players", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(newAccount)
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.text().then(text => { throw new Error(text) });
+            }
+            return response.json();
+        })
+        .then(data => {
+            alert("Cuenta creada con éxito");
+            document.getElementById("createAccountForm").reset();
+            list(currentPage, pageSize);
+        })
+        .catch(error => {
+            alert("Error al crear la cuenta:\n" + error.message);
+        });
+    }
+
+    function loadEnums() {
+        let races = ["HUMAN", "DWARF", "ELF", "GIANT", "ORC", "TROLL", "HOBBIT"];
+        let raceSelect = $("#newRace");
+        races.forEach(r => {
+            raceSelect.append(new Option(r, r));
+        });
+
+        let professions = ["WARRIOR", "ROGUE", "SORCERER", "CLERIC", "PALADIN", "NAZGUL", "WARLOCK", "DRUID"];
+        let professionSelect = $("#newProfession");
+        professions.forEach(p => {
+            professionSelect.append(new Option(p, p));
+        });
+    }
+
+    $(document).on("click", ".edit-btn", function() {
+    let id = $(this).data("id");
+    editAccount(id, this);
+    });
+
+    $(document).on("click", ".delete-btn", function() {
+        let id = $(this).data("id");
+        if (confirm("¿Seguro que deseas eliminar el jugador con ID: " + id + "?")) {
+            $.ajax({
+                url: "/rest/players/" + id,
+                type: "DELETE",
+                success: function() {
+                    alert("Jugador eliminado con éxito");
+                    list(currentPage, pageSize);
+                }
+            });
+        }
+    });
+
+    $(document).ready(function() {
+        $("#pageSizeSelect").on("change", function() {
+            list(0, parseInt($(this).val()));
+            loadTotalCount();
+        });
+        loadEnums();
+    });
+</script>
 
 </body>
 </html>
